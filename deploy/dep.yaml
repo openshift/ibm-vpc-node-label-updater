@@ -1,0 +1,88 @@
+apiVersion: v1
+stringData:
+  slclient.toml: |
+      [server]
+      debug_trace = false
+      [vpc]
+      iam_client_id = "bx"
+      iam_client_secret = "bx"
+      g2_token_exchange_endpoint_url = "{{{g2_token_exchange_endpoint_url}}}"
+      g2_riaas_endpoint_url = "{{{g2_riaas_endpoint_url}}}"
+      g2_resource_group_id = "{{{g2_resource_group_id}}}"
+      g2_api_key = "{{{g2_api_key}}}"
+      provider_type = "g2"
+kind: Secret
+metadata:
+  name: storage-secret-store
+  namespace: kube-system
+type: Opaque
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: node-sa
+  namespace: kube-system
+imagePullSecrets:
+  - name: icr-io-secret
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: cr-nodes
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, watch, list, update]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: crb-nodes
+subjects:
+  - kind: ServiceAccount
+    name: node-sa
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: cr-nodes
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-watcher
+  namespace: kube-system
+  labels:
+    demo.io/app: node-watcher
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      demo.io/app: node-watcher
+  template:
+    metadata:
+      labels:
+        demo.io/app: node-watcher
+    spec:
+      serviceAccount: node-sa
+      containers:
+      - name: myapp-container
+        image: nginx
+      initContainers:
+      - name: node-watcher
+        image: icr.io/testi/vpc-node-label-updater:v2
+        imagePullPolicy: Always
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: SECRET_CONFIG_PATH
+          value: /etc/storage_ibmc
+        volumeMounts:
+          - mountPath: /etc/storage_ibmc
+            name: customer-auth
+      volumes:
+        - name: customer-auth
+          secret:
+            secretName: storage-secret-store
