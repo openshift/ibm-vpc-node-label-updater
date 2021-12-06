@@ -1,0 +1,11 @@
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10 AS builder
+WORKDIR /go/src/github.com/IBM/vpc-node-label-updater
+COPY . .
+RUN make build
+
+FROM registry.ci.openshift.org/ocp/4.10:base
+RUN yum update -y && \
+    yum install --setopt=tsflags=nodocs -y ca-certificates && \
+    yum clean all && rm -rf /var/cache/yum/*
+COPY --from=builder /go/src/github.com/IBM/vpc-node-label-updater/vpc-node-label-updater  /usr/bin/vpc-node-label-updater
+ENTRYPOINT ["/usr/bin/vpc-node-lable-updater"]
