@@ -1,0 +1,11 @@
+[server]
+  debug_trace = false
+
+[vpc]
+  vpc_enabled = true
+  iam_client_id = "bx"
+  iam_client_secret = "bx"
+  g2_token_exchange_endpoint_url = "token_exchange_url"
+  g2_riaas_endpoint_url = "endpoint_url"
+  g2_resource_group_id = ""
+  g2_api_key = ""
