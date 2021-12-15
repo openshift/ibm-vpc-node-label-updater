@@ -106,7 +106,7 @@ func (m *MockVPCNodeLabelUpdater) GetInstancesFromVPC(riaasInstanceURL *url.URL)
 		return nil, errors.New("get \"\": unsupported protocol scheme \"\"")
 	}
 	if strings.Contains(riaasInstanceURL.Host, "invalid") {
-		return nil, errors.New("get \"https://invalid\": dial tcp: lookup invalid: Temporary failure in name resolution")
+		return nil, errors.New("get \"https://invalid\": dial tcp: lookup invalid")
 	}
 	ins := &Instance{
 		Name: "valid-worker",
@@ -143,7 +143,7 @@ func (m *MockVPCNodeLabelUpdater) GetInstanceByIP(workerNodeName string) (*NodeI
 		return nil, errors.New("get \"\": unsupported protocol scheme \"\"")
 	}
 	if strings.Contains(m.StorageSecretConfig.RiaasEndpointURL.Host, "invalid") {
-		return nil, errors.New("get \"https://invalid\": dial tcp: lookup invalid: Temporary failure in name resolution")
+		return nil, errors.New("get \"https://invalid\": dial tcp: lookup invalid")
 	}
 	if strings.Contains(workerNodeName, "valid-worker-ip") {
 		return &NodeInfo{}, nil
