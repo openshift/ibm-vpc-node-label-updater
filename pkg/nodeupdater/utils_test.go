@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -102,14 +103,14 @@ func TestGetAccessToken(t *testing.T) {
 			secretConfig: &StorageSecretConfig{
 				IamTokenExchangeURL: "https://xy",
 			},
-			expErr: errors.New("Post \"https://xy\": dial tcp: lookup xy: Temporary failure in name resolution"), //nolint
+			expErr: errors.New("Post \"https://xy\": dial tcp: lookup xy"), //nolint
 		},
 	}
 	for _, tc := range testCases {
 		t.Logf("Test case: %s", tc.name)
 		_, err := tc.secretConfig.GetAccessToken(logger)
 		if err != nil {
-			if err.Error() != tc.expErr.Error() {
+			if err.Error() != tc.expErr.Error() && !strings.Contains(err.Error(), tc.expErr.Error()) {
 				t.Fatalf("Expected error code: %v, got: %v. err : %v", tc.expErr, err, err)
 			}
 			continue
@@ -235,7 +236,7 @@ func TestGetInstancesFromVPC(t *testing.T) {
 			name:             "invalid riaasInstanceURL",
 			riaasInstanceURL: "https://invalid",
 			accessToken:      "valid-token",
-			expErr:           errors.New("Get \"https://invalid\": dial tcp: lookup invalid: Temporary failure in name resolution"), //nolint
+			expErr:           errors.New("Get \"https://invalid\": dial tcp: lookup invalid"), //nolint
 		},
 	}
 	updater := initNodeLabelUpdater(t)
@@ -251,7 +252,7 @@ func TestGetInstancesFromVPC(t *testing.T) {
 			updater.StorageSecretConfig.IAMAccessToken = tc.accessToken
 			_, err := updater.GetInstancesFromVPC(riaasInsURL)
 			if err != nil {
-				if err.Error() != tc.expErr.Error() {
+				if err.Error() != tc.expErr.Error() && !strings.Contains(err.Error(), tc.expErr.Error()) {
 					t.Fatalf("Expected error : %v, got: %v. err : %v", tc.expErr, err, err)
 				}
 			}
@@ -293,7 +294,7 @@ func TestGetInstanceByIP(t *testing.T) {
 			name:             "invalid riaasInstanceURL",
 			riaasInstanceURL: "https://invalid",
 			accessToken:      "valid-token",
-			expErr:           errors.New("get \"https://invalid\": dial tcp: lookup invalid: Temporary failure in name resolution"),
+			expErr:           errors.New("get \"https://invalid\": dial tcp: lookup invalid"),
 		},
 		{
 			name:             "invalid worker-ip",
@@ -311,7 +312,7 @@ func TestGetInstanceByIP(t *testing.T) {
 		mockupdater.StorageSecretConfig.RiaasEndpointURL = riaasInsURL
 		_, err := mockupdater.GetInstanceByIP(tc.workerNodeName)
 		if err != nil {
-			if err.Error() != tc.expErr.Error() {
+			if err.Error() != tc.expErr.Error() && !strings.Contains(err.Error(), tc.expErr.Error()) {
 				t.Fatalf("Expected error : %v, got: %v. err : %v", tc.expErr, err, err)
 			}
 		}
@@ -352,7 +353,7 @@ func TestGetInstanceByName(t *testing.T) {
 			name:             "invalid riaasInstanceURL",
 			riaasInstanceURL: "https://invalid",
 			accessToken:      "valid-token",
-			expErr:           errors.New("get \"https://invalid\": dial tcp: lookup invalid: Temporary failure in name resolution"),
+			expErr:           errors.New("get \"https://invalid\": dial tcp: lookup invalid"),
 		},
 		{
 			name:             "invalid worker",
@@ -416,7 +417,7 @@ func TestGetWorkerDetails(t *testing.T) {
 			name:             "invalid riaasInstanceURL",
 			riaasInstanceURL: "https://invalid",
 			accessToken:      "valid-token",
-			expErr:           errors.New("get \"https://invalid\": dial tcp: lookup invalid: Temporary failure in name resolution"),
+			expErr:           errors.New("get \"https://invalid\": dial tcp: lookup invalid"),
 		},
 		{
 			name:             "invalid worker",

@@ -21,6 +21,7 @@ import (
 	"context"
 	errors "errors"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,7 +62,7 @@ func TestUpdateNodeLabel(t *testing.T) {
 			workerNodeName:   "",
 			riaasInstanceURL: "https://invalid",
 			accessToken:      "valid-token",
-			expErr:           errors.New("Get \"https://invalid?name=\": dial tcp: lookup invalid: Temporary failure in name resolution"), //nolint
+			expErr:           errors.New("Get \"https://invalid?name=\": dial tcp: lookup invalid"), //nolint
 		},
 	}
 	mockupdater := initNodeLabelUpdater(t)
@@ -78,7 +79,7 @@ func TestUpdateNodeLabel(t *testing.T) {
 			mockupdater.StorageSecretConfig.RiaasEndpointURL = riaasInsURL
 			_, err := mockupdater.UpdateNodeLabel(context.TODO(), tc.workerNodeName)
 			if err != nil {
-				if err.Error() != tc.expErr.Error() {
+				if err.Error() != tc.expErr.Error() && !strings.Contains(err.Error(), tc.expErr.Error()) {
 					t.Fatalf("Expected error : %v, got: %v. err : %v", tc.expErr, err, err)
 				}
 			}
