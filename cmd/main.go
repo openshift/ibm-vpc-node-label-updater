@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	nodeupdater "github.com/IBM/vpc-node-label-updater/pkg/nodeupdater"
 	"go.uber.org/zap"
@@ -114,24 +113,17 @@ func main() {
 		if errors.IsNotFound(err) {
 			runtimeu.HandleError(fmt.Errorf("node '%s' no longer exist in the cluster", nodeName))
 		}
-		// Do multiple retries if there is connection error.
-		logger.Info("Retrying connection to node")
+		// Do multiple retries to get node details.
+		logger.Info("Getting node details")
 		errRetry := nodeupdater.ErrorRetry(logger, func() (error, bool) {
 			node, err = k8sClientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 			if err != nil {
-				var shouldStop bool
-				errString := err.Error()
-				if strings.Contains(errString, "tcp") {
-					shouldStop = false
-				} else {
-					shouldStop = true
-				}
-				return err, shouldStop // Skip retry if its not connection error
+				return err, false // Continue retry if error is there.
 			}
 			return nil, true
 		})
 		if errRetry != nil {
-			logger.Fatal("Error retrieving the Node from the index for a given node. Error :", zap.Error(err))
+			logger.Fatal("Failed to get node details. Error :", zap.Error(errRetry))
 		}
 		return
 	}
