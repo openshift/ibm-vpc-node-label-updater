@@ -115,12 +115,15 @@ func main() {
 		if errors.IsNotFound(err) {
 			runtimeu.HandleError(fmt.Errorf("node '%s' no longer exist in the cluster", nodeName))
 		}
-		// Do multiple retries if there is connection error
-		nodeupdater.ErrorRetry(logger, func() (error, bool) {
+		// Do multiple retries if there is connection error.
+		logger.Info("Retrying connection to node")
+		err = nodeupdater.ErrorRetry(logger, func() (error, bool) {
 			node, err = k8sClientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 			return err, !iam.IsConnectionError(err)
 		})
-		logger.Fatal("Error retrieving the Node from the index for a given node. Error :", zap.Error(err))
+		if err != nil {
+			logger.Fatal("Error retrieving the Node from the index for a given node. Error :", zap.Error(err))
+		}
 		return
 	}
 
