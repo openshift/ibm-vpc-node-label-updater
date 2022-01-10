@@ -118,14 +118,17 @@ func main() {
 		logger.Info("Retrying connection to node")
 		errRetry := nodeupdater.ErrorRetry(logger, func() (error, bool) {
 			node, err = k8sClientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-			errString := err.Error()
-			var shouldStop bool
-			if strings.Contains(errString, "tcp") {
-				shouldStop = false
-			} else {
-				shouldStop = true
+			if err != nil {
+				var shouldStop bool
+				errString := err.Error()
+				if strings.Contains(errString, "tcp") {
+					shouldStop = false
+				} else {
+					shouldStop = true
+				}
+				return err, shouldStop // Skip retry if its not connection error
 			}
-			return err, shouldStop // Skip retry if its not connection error
+			return nil, true
 		})
 		if errRetry != nil {
 			logger.Fatal("Error retrieving the Node from the index for a given node. Error :", zap.Error(err))
