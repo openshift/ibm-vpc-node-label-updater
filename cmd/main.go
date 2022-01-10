@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/IBM/ibmcloud-volume-interface/provider/iam"
 	nodeupdater "github.com/IBM/vpc-node-label-updater/pkg/nodeupdater"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -109,11 +110,17 @@ func main() {
 	}
 	nodeName := os.Getenv("NODE_NAME")
 	node, err := k8sClientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+
 	if err != nil {
-		logger.Info("Error retrieving the Node from the index for a given node. Error :", zap.Error(err))
 		if errors.IsNotFound(err) {
 			runtimeu.HandleError(fmt.Errorf("node '%s' no longer exist in the cluster", nodeName))
 		}
+		// Do multiple retries if there is connection error
+		nodeupdater.ErrorRetry(logger, func() (error, bool) {
+			node, err = k8sClientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			return err, !iam.IsConnectionError(err)
+		})
+		logger.Fatal("Error retrieving the Node from the index for a given node. Error :", zap.Error(err))
 		return
 	}
 
