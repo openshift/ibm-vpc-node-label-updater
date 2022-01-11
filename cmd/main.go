@@ -27,6 +27,7 @@ import (
 	nodeupdater "github.com/IBM/vpc-node-label-updater/pkg/nodeupdater"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeu "k8s.io/apimachinery/pkg/util/runtime"
@@ -108,24 +109,23 @@ func main() {
 		logger.Fatal("Failed to kubernetes create client set", zap.Error(err))
 	}
 	nodeName := os.Getenv("NODE_NAME")
-	node, err := k8sClientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	if err != nil {
+
+	// Do multiple retries to get node details.
+	logger.Info("Getting node details")
+	var node *v1.Node
+	errRetry := nodeupdater.ErrorRetry(logger, func() (error, bool) {
+		node, err = k8sClientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			runtimeu.HandleError(fmt.Errorf("node '%s' no longer exist in the cluster", nodeName))
+			return err, true // Skip retry if node doesnot exist.
 		}
-		// Do multiple retries to get node details.
-		logger.Info("Getting node details")
-		errRetry := nodeupdater.ErrorRetry(logger, func() (error, bool) {
-			node, err = k8sClientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-			if err != nil {
-				return err, false // Continue retry if error is there.
-			}
-			return nil, true
-		})
-		if errRetry != nil {
-			logger.Fatal("Failed to get node details. Error :", zap.Error(errRetry))
+		if err != nil {
+			return err, false // Continue retry if error is there.
 		}
-		return
+		return nil, true
+	})
+	if errRetry != nil {
+		logger.Fatal("Failed to get node details. Error :", zap.Error(errRetry))
 	}
 
 	if nodeupdater.CheckIfRequiredLabelsPresent(node.ObjectMeta.Labels) {
