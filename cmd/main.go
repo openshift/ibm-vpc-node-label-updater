@@ -124,7 +124,7 @@ func main() {
 		}
 		return nil, true
 	})
-	if errRetry != nil {
+	if errRetry != nil || node == nil {
 		logger.Fatal("Failed to get node details. Error :", zap.Error(errRetry))
 	}
 
