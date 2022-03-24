@@ -43,7 +43,9 @@ var (
 func init() {
 	_ = flag.Set("logtostderr", "true") // #nosec G104: Attempt to set flags for logging to stderr only on best-effort basis.Error cannot be usefully handled.
 	logger = setUpLogger()
-	defer logger.Sync()
+	defer func() {
+		_ = logger.Sync() // #nosec G104: Attempt to logg sync only on best-effort basis.Error cannot be usefully handled.
+	}()
 }
 
 func setUpLogger() *zap.Logger {
