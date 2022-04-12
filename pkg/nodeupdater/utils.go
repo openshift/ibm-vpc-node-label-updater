@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -52,12 +53,29 @@ const (
 
 // ReadStorageSecretConfiguration ...
 func ReadStorageSecretConfiguration(ctxLogger *zap.Logger) (*StorageSecretConfig, error) {
+	ctxLogger.Info("Fetching secret configuration.")
 	configPath := filepath.Join(config.GetConfPathDir(), configFileName)
 	conf, err := readConfig(configPath, ctxLogger)
 	if err != nil {
 		ctxLogger.Info("Error loading secret configuration")
 		return nil, err
 	}
+
+	//Decode g2 API Key if it is a satellite cluster.
+	if is_satellite := os.Getenv(strings.ToUpper("IS_SATELLITE")); is_satellite == "True" {
+		ctxLogger.Info("Decoding apiKey since its a satellite cluster")
+		apiKey, err := base64.StdEncoding.DecodeString(conf.VPC.G2APIKey)
+		if err != nil {
+			return nil, err
+		}
+		conf.VPC.G2APIKey = string(apiKey)
+	}
+
+	// Correct if the G2EndpointURL is of the form "http://".
+	conf.VPC.G2EndpointURL = getEndpointURL(conf.VPC.G2EndpointURL, ctxLogger)
+
+	// Correct if the G2TokenExchangeURL is of the form "http://"
+	conf.VPC.G2TokenExchangeURL = getEndpointURL(conf.VPC.G2TokenExchangeURL, ctxLogger)
 
 	riaasInstanceURL, err := url.Parse(fmt.Sprintf("%s/v1/instances?generation=%s&version=%s", conf.VPC.G2EndpointURL, vpcGeneration, vpcRiaasVersion))
 	if err != nil {
@@ -128,7 +146,7 @@ func readConfig(confPath string, logger *zap.Logger) (*config.Config, error) {
 
 	// Parse config file
 	conf := config.Config{
-		IKS: &config.IKSConfig{}, // IKS block may not be populated in secrete toml. Make sure its not nil
+		IKS: &config.IKSConfig{}, // IKS block may not be populated in secret toml. Make sure its not nil
 	}
 	logger.Info("parsing conf file", zap.String("confpath", confPath))
 	err := parseConfig(confPath, &conf, logger)
@@ -177,6 +195,15 @@ func CheckIfRequiredLabelsPresent(labelMap map[string]string) bool {
 		return true
 	}
 	return false
+}
+
+// getEndpointURL corrects endpoint url if it is of form "http://"
+func getEndpointURL(url string, logger *zap.Logger) string {
+	if strings.Contains(url, "http://") {
+		logger.Warn("Token exchange endpoint URL is of the form 'http' instead 'https'. Correcting it for valid request.", zap.Reflect("Endpoint URL: ", url))
+		return strings.Replace(url, "http", "https", 1)
+	}
+	return url
 }
 
 // GetWorkerDetails ...
