@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	workerIDLabelKey       = "ibm-cloud.kubernetes.io/worker-id"
+	instanceIDLabelKey     = "ibm-cloud.kubernetes.io/vpc-instance-id"
 	failureRegionLabelKey  = "failure-domain.beta.kubernetes.io/region"
 	failureZoneLabelKey    = "failure-domain.beta.kubernetes.io/zone"
 	topologyRegionLabelKey = "topology.kubernetes.io/region"
@@ -61,8 +61,8 @@ func ReadStorageSecretConfiguration(ctxLogger *zap.Logger) (*StorageSecretConfig
 		return nil, err
 	}
 
-	//Decode g2 API Key if it is a satellite cluster.
-	if is_satellite := os.Getenv(strings.ToUpper("IS_SATELLITE")); is_satellite == "True" {
+	// Decode g2 API Key if it is a satellite cluster.(unmanaged cluster)
+	if os.Getenv(strings.ToUpper("IKS_ENABLED")) != "True" && os.Getenv(strings.ToUpper("IS_SATELLITE")) == "True" {
 		ctxLogger.Info("Decoding apiKey since its a satellite cluster")
 		apiKey, err := base64.StdEncoding.DecodeString(conf.VPC.G2APIKey)
 		if err != nil {
@@ -122,6 +122,12 @@ func (secretConfig *StorageSecretConfig) GetAccessToken(ctxLogger *zap.Logger) (
 	if err != nil {
 		return "", err
 	}
+
+	if res == nil || res.StatusCode != 200 {
+		ctxLogger.Error("IAM token exchange request failed")
+		return "", fmt.Errorf("status Code: %v, check API key providied", res.StatusCode)
+	}
+
 	// read response body
 	accessTokenRes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -191,7 +197,12 @@ func ErrorRetry(logger *zap.Logger, funcToRetry func() (error, bool)) error {
 
 // CheckIfRequiredLabelsPresent checks if nodes are already labeled with the required labels
 func CheckIfRequiredLabelsPresent(labelMap map[string]string) bool {
-	if _, ok := labelMap[vpcBlockLabelKey]; ok {
+	_, okvpcBlockLabelKey := labelMap[vpcBlockLabelKey]
+	_, okvpcInstanceID := labelMap[instanceIDLabelKey]
+	/* For users using version <=4.2.2, need to check for both label vpcBlockLabelKey and instanceIDLabelKey
+	TODO: Keep only check for vpcBlockLabelKey when version 4.2.2 is removed
+	*/
+	if okvpcBlockLabelKey && okvpcInstanceID {
 		return true
 	}
 	return false
