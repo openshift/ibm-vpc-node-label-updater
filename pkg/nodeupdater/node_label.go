@@ -44,7 +44,7 @@ func (c *VpcNodeLabelUpdater) UpdateNodeLabel(ctx context.Context, workerNodeNam
 		return false, err
 	}
 
-	c.Node.ObjectMeta.Labels[workerIDLabelKey] = nodeinfo.InstanceID
+	c.Node.ObjectMeta.Labels[instanceIDLabelKey] = nodeinfo.InstanceID
 	c.Node.ObjectMeta.Labels[failureRegionLabelKey] = nodeinfo.Region
 	c.Node.ObjectMeta.Labels[failureZoneLabelKey] = nodeinfo.Zone
 	c.Node.ObjectMeta.Labels[topologyRegionLabelKey] = nodeinfo.Region
