@@ -109,7 +109,7 @@ func TestGetAccessToken(t *testing.T) {
 	for _, tc := range testCases {
 		t.Logf("Test case: %s", tc.name)
 		_, err := tc.secretConfig.GetAccessToken(logger)
-		if err != nil {
+		if err != nil && tc.expErr != nil {
 			if err.Error() != tc.expErr.Error() && !strings.Contains(err.Error(), tc.expErr.Error()) {
 				t.Fatalf("Expected error code: %v, got: %v. err : %v", tc.expErr, err, err)
 			}
@@ -199,6 +199,7 @@ func TestCheckIfRequiredLabelsPresent(t *testing.T) {
 	exp := CheckIfRequiredLabelsPresent(labelMap)
 	assert.Equal(t, exp, false)
 	labelMap[vpcBlockLabelKey] = "true"
+	labelMap[instanceIDLabelKey] = "true"
 	ex := CheckIfRequiredLabelsPresent(labelMap)
 	assert.Equal(t, ex, true)
 }
