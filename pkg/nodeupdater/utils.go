@@ -38,6 +38,7 @@ import (
 )
 
 const (
+	workerIDLabelKey       = "ibm-cloud.kubernetes.io/worker-id"
 	instanceIDLabelKey     = "ibm-cloud.kubernetes.io/vpc-instance-id"
 	failureRegionLabelKey  = "failure-domain.beta.kubernetes.io/region"
 	failureZoneLabelKey    = "failure-domain.beta.kubernetes.io/zone"
