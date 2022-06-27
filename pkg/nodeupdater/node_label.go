@@ -44,6 +44,9 @@ func (c *VpcNodeLabelUpdater) UpdateNodeLabel(ctx context.Context, workerNodeNam
 		return false, err
 	}
 
+	// Are adding both worker-id and instance-id label to satisfy all environements.
+	// TODO: remove worker-id label after its dependence is removed.
+	c.Node.ObjectMeta.Labels[workerIDLabelKey] = nodeinfo.InstanceID
 	c.Node.ObjectMeta.Labels[instanceIDLabelKey] = nodeinfo.InstanceID
 	c.Node.ObjectMeta.Labels[failureRegionLabelKey] = nodeinfo.Region
 	c.Node.ObjectMeta.Labels[failureZoneLabelKey] = nodeinfo.Zone
