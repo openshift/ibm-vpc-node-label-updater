@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -38,6 +39,7 @@ import (
 
 const (
 	workerIDLabelKey       = "ibm-cloud.kubernetes.io/worker-id"
+	instanceIDLabelKey     = "ibm-cloud.kubernetes.io/vpc-instance-id"
 	failureRegionLabelKey  = "failure-domain.beta.kubernetes.io/region"
 	failureZoneLabelKey    = "failure-domain.beta.kubernetes.io/zone"
 	topologyRegionLabelKey = "topology.kubernetes.io/region"
@@ -52,12 +54,29 @@ const (
 
 // ReadStorageSecretConfiguration ...
 func ReadStorageSecretConfiguration(ctxLogger *zap.Logger) (*StorageSecretConfig, error) {
+	ctxLogger.Info("Fetching secret configuration.")
 	configPath := filepath.Join(config.GetConfPathDir(), configFileName)
 	conf, err := readConfig(configPath, ctxLogger)
 	if err != nil {
 		ctxLogger.Info("Error loading secret configuration")
 		return nil, err
 	}
+
+	// Decode g2 API Key if it is a satellite cluster.(unmanaged cluster)
+	if os.Getenv(strings.ToUpper("IKS_ENABLED")) != "True" && os.Getenv(strings.ToUpper("IS_SATELLITE")) == "True" {
+		ctxLogger.Info("Decoding apiKey since its a satellite cluster")
+		apiKey, err := base64.StdEncoding.DecodeString(conf.VPC.G2APIKey)
+		if err != nil {
+			return nil, err
+		}
+		conf.VPC.G2APIKey = string(apiKey)
+	}
+
+	// Correct if the G2EndpointURL is of the form "http://".
+	conf.VPC.G2EndpointURL = getEndpointURL(conf.VPC.G2EndpointURL, ctxLogger)
+
+	// Correct if the G2TokenExchangeURL is of the form "http://"
+	conf.VPC.G2TokenExchangeURL = getEndpointURL(conf.VPC.G2TokenExchangeURL, ctxLogger)
 
 	riaasInstanceURL, err := url.Parse(fmt.Sprintf("%s/v1/instances?generation=%s&version=%s", conf.VPC.G2EndpointURL, vpcGeneration, vpcRiaasVersion))
 	if err != nil {
@@ -104,6 +123,12 @@ func (secretConfig *StorageSecretConfig) GetAccessToken(ctxLogger *zap.Logger) (
 	if err != nil {
 		return "", err
 	}
+
+	if res == nil || res.StatusCode != 200 {
+		ctxLogger.Error("IAM token exchange request failed")
+		return "", fmt.Errorf("status Code: %v, check API key providied", res.StatusCode)
+	}
+
 	// read response body
 	accessTokenRes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -128,7 +153,7 @@ func readConfig(confPath string, logger *zap.Logger) (*config.Config, error) {
 
 	// Parse config file
 	conf := config.Config{
-		IKS: &config.IKSConfig{}, // IKS block may not be populated in secrete toml. Make sure its not nil
+		IKS: &config.IKSConfig{}, // IKS block may not be populated in secret toml. Make sure its not nil
 	}
 	logger.Info("parsing conf file", zap.String("confpath", confPath))
 	err := parseConfig(confPath, &conf, logger)
@@ -173,10 +198,24 @@ func ErrorRetry(logger *zap.Logger, funcToRetry func() (error, bool)) error {
 
 // CheckIfRequiredLabelsPresent checks if nodes are already labeled with the required labels
 func CheckIfRequiredLabelsPresent(labelMap map[string]string) bool {
-	if _, ok := labelMap[vpcBlockLabelKey]; ok {
+	_, okvpcBlockLabelKey := labelMap[vpcBlockLabelKey]
+	_, okvpcInstanceID := labelMap[instanceIDLabelKey]
+	/* For users using version <=4.2.2, need to check for both label vpcBlockLabelKey and instanceIDLabelKey
+	TODO: Keep only check for vpcBlockLabelKey when version 4.2.2 is removed
+	*/
+	if okvpcBlockLabelKey && okvpcInstanceID {
 		return true
 	}
 	return false
+}
+
+// getEndpointURL corrects endpoint url if it is of form "http://"
+func getEndpointURL(url string, logger *zap.Logger) string {
+	if strings.Contains(url, "http://") {
+		logger.Warn("Token exchange endpoint URL is of the form 'http' instead 'https'. Correcting it for valid request.", zap.Reflect("Endpoint URL: ", url))
+		return strings.Replace(url, "http", "https", 1)
+	}
+	return url
 }
 
 // GetWorkerDetails ...
