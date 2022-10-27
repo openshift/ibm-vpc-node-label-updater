@@ -18,7 +18,6 @@
 package nodeupdater
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	errors "errors"
 	"fmt"
@@ -26,14 +25,11 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/BurntSushi/toml"
-	"github.com/IBM/ibmcloud-volume-interface/config"
 	"github.com/IBM/ibmcloud-volume-interface/provider/iam"
+	sp "github.com/IBM/secret-common-lib/pkg/secret_provider"
 	"go.uber.org/zap"
 )
 
@@ -52,120 +48,42 @@ const (
 	vpcBlockLabelKey       = "vpc-block-csi-driver-labels"
 )
 
-// ReadStorageSecretConfiguration ...
-func ReadStorageSecretConfiguration(ctxLogger *zap.Logger) (*StorageSecretConfig, error) {
+// ReadSecretConfiguration ...
+func ReadSecretConfiguration(ctxLogger *zap.Logger) (*StorageSecretConfig, error) {
 	ctxLogger.Info("Fetching secret configuration.")
-	configPath := filepath.Join(config.GetConfPathDir(), configFileName)
-	conf, err := readConfig(configPath, ctxLogger)
+	providerType := map[string]string{
+		sp.ProviderType: sp.VPC,
+	}
+	spObject, err := sp.NewSecretProvider(providerType)
 	if err != nil {
-		ctxLogger.Info("Error loading secret configuration")
+		ctxLogger.Error("Error initializing secret provider", zap.Error(err))
 		return nil, err
 	}
 
-	// Decode g2 API Key if it is a satellite cluster.(unmanaged cluster)
-	if os.Getenv(strings.ToUpper("IKS_ENABLED")) != "True" && os.Getenv(strings.ToUpper("IS_SATELLITE")) == "True" {
-		ctxLogger.Info("Decoding apiKey since its a satellite cluster")
-		apiKey, err := base64.StdEncoding.DecodeString(conf.VPC.G2APIKey)
-		if err != nil {
-			return nil, err
-		}
-		conf.VPC.G2APIKey = string(apiKey)
+	riaasURL, err := spObject.GetRIAASEndpoint(false)
+	if err != nil {
+		ctxLogger.Error("Error fetching RIAAS endpoint", zap.Error(err))
+		return nil, err
 	}
 
 	// Correct if the G2EndpointURL is of the form "http://".
-	conf.VPC.G2EndpointURL = getEndpointURL(conf.VPC.G2EndpointURL, ctxLogger)
-
-	// Correct if the G2TokenExchangeURL is of the form "http://"
-	conf.VPC.G2TokenExchangeURL = getEndpointURL(conf.VPC.G2TokenExchangeURL, ctxLogger)
-
-	riaasInstanceURL, err := url.Parse(fmt.Sprintf("%s/v1/instances?generation=%s&version=%s", conf.VPC.G2EndpointURL, vpcGeneration, vpcRiaasVersion))
+	riaasURL = getEndpointURL(riaasURL, ctxLogger)
+	riaasInstanceURL, err := url.Parse(fmt.Sprintf("%s/v1/instances?generation=%s&version=%s", riaasURL, vpcGeneration, vpcRiaasVersion))
 	if err != nil {
 		ctxLogger.Error("Failed to parse riassInstanceURL", zap.Error(err))
 		return nil, err
 	}
-
 	storageSecretConfig := &StorageSecretConfig{
-		APIKey:              conf.VPC.G2APIKey,
-		IamTokenExchangeURL: fmt.Sprintf("%s/oidc/token", conf.VPC.G2TokenExchangeURL),
-		RiaasEndpointURL:    riaasInstanceURL,
-		BasicAuthString:     fmt.Sprintf("%s:%s", conf.VPC.IamClientID, conf.VPC.IamClientSecret),
+		RiaasEndpointURL: riaasInstanceURL,
 	}
 
-	accessToken, err := storageSecretConfig.GetAccessToken(ctxLogger)
+	accessToken, _, err := spObject.GetDefaultIAMToken(false, "vpc-node-label-updater")
 	if err != nil {
 		ctxLogger.Error("Failed to Get IAM access token", zap.Error(err))
 		return nil, err
 	}
 	storageSecretConfig.IAMAccessToken = accessToken
 	return storageSecretConfig, nil
-}
-
-// GetAccessToken ...
-func (secretConfig *StorageSecretConfig) GetAccessToken(ctxLogger *zap.Logger) (string, error) {
-	form := url.Values{}
-	form.Set("grant_type", "urn:ibm:params:oauth:grant-type:apikey")
-	form.Set("apikey", secretConfig.APIKey)
-
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", secretConfig.IamTokenExchangeURL, strings.NewReader(form.Encode())) // URL-encoded payload
-	if err != nil {
-		return "", err
-	}
-
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(secretConfig.BasicAuthString))))
-	req.Header.Add("Accept", "application/json")
-
-	var res *http.Response
-	err = ErrorRetry(ctxLogger, func() (error, bool) {
-		res, err = client.Do(req)               //nolint
-		return err, !iam.IsConnectionError(err) // Skip retry if its not connection error
-	})
-	if err != nil {
-		return "", err
-	}
-
-	if res == nil || res.StatusCode != 200 {
-		ctxLogger.Error("IAM token exchange request failed")
-		return "", fmt.Errorf("status Code: %v, check API key providied", res.StatusCode)
-	}
-
-	// read response body
-	accessTokenRes, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		ctxLogger.Error("failed to read response body for getting access token in exchange of apikey", zap.Error(err))
-		return "", err
-	}
-	defer res.Body.Close()
-	var accessToken AccessTokenResponse
-	err = json.Unmarshal(accessTokenRes, &accessToken)
-	if err != nil {
-		return "", errors.New("failed to unmarshal json response for access token")
-	}
-	ctxLogger.Info("Successfully got access token in exchange of apikey")
-	return accessToken.AccessToken, nil
-}
-
-func readConfig(confPath string, logger *zap.Logger) (*config.Config, error) {
-	// load the default config, if confPath not provided
-	if confPath == "" {
-		confPath = config.GetDefaultConfPath()
-	}
-
-	// Parse config file
-	conf := config.Config{
-		IKS: &config.IKSConfig{}, // IKS block may not be populated in secret toml. Make sure its not nil
-	}
-	logger.Info("parsing conf file", zap.String("confpath", confPath))
-	err := parseConfig(confPath, &conf, logger)
-	return &conf, err
-}
-
-func parseConfig(filePath string, conf interface{}, logger *zap.Logger) error {
-	_, err := toml.DecodeFile(filePath, conf)
-	if err != nil {
-		logger.Error("Failed to parse config file", zap.Error(err))
-	}
-	return err
 }
 
 // ErrorRetry ...

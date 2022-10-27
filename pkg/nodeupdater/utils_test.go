@@ -19,7 +19,6 @@ package nodeupdater
 
 import (
 	errors "errors"
-	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -50,72 +49,17 @@ func initNodeLabelUpdater(t *testing.T) *VpcNodeLabelUpdater {
 	return mockVPCNodeLabelUpdater
 }
 
-func TestReadStorageSecretConfiguration(t *testing.T) {
+func TestReadSecretConfiguration(t *testing.T) {
 	// Creating test logger
 	logger, teardown := GetTestLogger(t)
 	defer teardown()
 
-	pwd, err := os.Getwd()
-	if err != nil {
-		t.Errorf("Failed to get current working directory, some unit tests will fail")
-	}
-
-	// As its required by NewIBMCloudStorageProvider
-	secretConfigPath := filepath.Join(pwd, "..", "..", "test-fixtures")
-	err = os.Setenv("SECRET_CONFIG_PATH", secretConfigPath)
-	defer os.Unsetenv("SECRET_CONFIG_PATH")
 	if err != nil {
 		t.Errorf("This test will fail because of %v", err)
 	}
 
-	_, err = ReadStorageSecretConfiguration(logger)
+	_, err = ReadSecretConfiguration(logger)
 	assert.NotNil(t, err)
-}
-
-func TestGetAccessToken(t *testing.T) {
-	// Creating test logger
-	logger, teardown := GetTestLogger(t)
-	defer teardown()
-	testCases := []struct {
-		name         string
-		secretConfig *StorageSecretConfig
-		expErr       error
-	}{
-		{
-			name: "valid Request",
-
-			secretConfig: &StorageSecretConfig{
-				IamTokenExchangeURL: "https://iam.bluemix.net/oidc/token",
-				APIKey:              "ghytfyhgj",
-				BasicAuthString:     fmt.Sprintf("%s:%s", "bx", "bx"),
-			},
-			expErr: nil,
-		},
-		{
-			name: "Empty IamTokenExchangeURL",
-			secretConfig: &StorageSecretConfig{
-				IamTokenExchangeURL: "",
-			},
-			expErr: errors.New("Post \"\": unsupported protocol scheme \"\""), //nolint
-		},
-		{
-			name: "invalid IamTokenExchangeURL",
-			secretConfig: &StorageSecretConfig{
-				IamTokenExchangeURL: "https://xy",
-			},
-			expErr: errors.New("Post \"https://xy\": dial tcp: lookup xy"), //nolint
-		},
-	}
-	for _, tc := range testCases {
-		t.Logf("Test case: %s", tc.name)
-		_, err := tc.secretConfig.GetAccessToken(logger)
-		if err != nil && tc.expErr != nil {
-			if err.Error() != tc.expErr.Error() && !strings.Contains(err.Error(), tc.expErr.Error()) {
-				t.Fatalf("Expected error code: %v, got: %v. err : %v", tc.expErr, err, err)
-			}
-			continue
-		}
-	}
 }
 
 type testConfig struct {
@@ -138,60 +82,6 @@ var testConf = testConfig{
 		Pi:      3.14,
 		List:    "1, 2",
 	},
-}
-
-func TestParseConfig(t *testing.T) {
-	logger, teardown := GetTestLogger(t)
-	defer teardown()
-	var testParseConf testConfig
-
-	configPath := "test.toml"
-	err := parseConfig(configPath, &testParseConf, logger)
-	assert.Nil(t, err)
-
-	expected := testConf
-	assert.Exactly(t, expected, testParseConf)
-}
-
-func TestParseConfigNoMatch(t *testing.T) {
-	logger, teardown := GetTestLogger(t)
-	defer teardown()
-	var testParseConf testConfig
-
-	configPath := "test.toml"
-	err := parseConfig(configPath, &testParseConf, logger)
-	assert.Nil(t, err)
-
-	expected := testConfig{
-		Header: sectionTestConfig{
-			ID:      1,
-			Name:    "testnomatch",
-			YesOrNo: true,
-			Pi:      3.14,
-			List:    "1, 2",
-		}}
-
-	assert.NotEqual(t, expected, testParseConf)
-}
-
-func TestReadConfig(t *testing.T) {
-	logger, teardown := GetTestLogger(t)
-	defer teardown()
-
-	configPath := "test.toml"
-	expectedConf, _ := readConfig(configPath, logger)
-
-	assert.NotNil(t, expectedConf)
-}
-
-func TestReadConfigEmptyPath(t *testing.T) {
-	logger, teardown := GetTestLogger(t)
-	defer teardown()
-
-	configPath := ""
-	expectedConf, _ := readConfig(configPath, logger)
-
-	assert.NotNil(t, expectedConf)
 }
 
 func TestCheckIfRequiredLabelsPresent(t *testing.T) {

@@ -136,8 +136,8 @@ func main() {
 	}
 
 	var secretConfig *nodeupdater.StorageSecretConfig
-	if secretConfig, err = nodeupdater.ReadStorageSecretConfiguration(logger); err != nil {
-		logger.Fatal("Failed to read secret configuration from storage secret present in the cluster ", zap.Error(err))
+	if secretConfig, err = nodeupdater.ReadSecretConfiguration(logger); err != nil {
+		logger.Fatal("Failed to read secret configuration", zap.Error(err))
 	}
 	c := &nodeupdater.VpcNodeLabelUpdater{
 		Node:                node,
