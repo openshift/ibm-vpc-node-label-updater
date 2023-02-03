@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	errors "errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -30,6 +30,7 @@ import (
 
 	"github.com/IBM/ibmcloud-volume-interface/provider/iam"
 	sp "github.com/IBM/secret-common-lib/pkg/secret_provider"
+	"github.com/IBM/secret-utils-lib/pkg/k8s_utils"
 	"go.uber.org/zap"
 )
 
@@ -40,7 +41,6 @@ const (
 	failureZoneLabelKey    = "failure-domain.beta.kubernetes.io/zone"
 	topologyRegionLabelKey = "topology.kubernetes.io/region"
 	topologyZoneLabelKey   = "topology.kubernetes.io/zone"
-	configFileName         = "slclient.toml"
 	vpcGeneration          = "2"
 	vpcRiaasVersion        = "2020-01-01"
 	maxAttempts            = 30
@@ -49,12 +49,12 @@ const (
 )
 
 // ReadSecretConfiguration ...
-func ReadSecretConfiguration(ctxLogger *zap.Logger) (*StorageSecretConfig, error) {
+func ReadSecretConfiguration(k8sClient *k8s_utils.KubernetesClient, ctxLogger *zap.Logger) (*StorageSecretConfig, error) {
 	ctxLogger.Info("Fetching secret configuration.")
 	providerType := map[string]string{
 		sp.ProviderType: sp.VPC,
 	}
-	spObject, err := sp.NewSecretProvider(providerType)
+	spObject, err := sp.NewSecretProvider(k8sClient, providerType)
 	if err != nil {
 		ctxLogger.Error("Error initializing secret provider", zap.Error(err))
 		return nil, err
@@ -172,7 +172,7 @@ func (c *VpcNodeLabelUpdater) GetInstancesFromVPC(riaasInstanceURL *url.URL) ([]
 	}
 	defer instanceResponse.Body.Close()
 	// read response body
-	instance, err := ioutil.ReadAll(instanceResponse.Body)
+	instance, err := io.ReadAll(instanceResponse.Body)
 	if err != nil {
 		c.Logger.Error("Failed to read response body of instance details from riaas provider", zap.Error(err))
 		return nil, err

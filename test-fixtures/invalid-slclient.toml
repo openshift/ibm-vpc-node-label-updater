@@ -1,0 +1,11 @@
+[server]
+  debug_trace = false
+
+[vpc]
+  vpc_enabled = true
+  iam_client_id = "bx"
+  iam_client_secret = "bx"
+  g2_token_exchange_endpoint_url = "https://iam.cloud.ibm.com"
+  g2_riaas_endpoint_url = ""
+  g2_resource_group_id = "resource-group-id"
+  g2_api_key = "api-key"

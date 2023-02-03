@@ -47,10 +47,12 @@ type ManagedSecretProvider struct {
 	resourceGroupID          string
 }
 
-// newManagedSecretProvider ...
+// newManagedSecretProvider makes a call to storage-secret-sidecar to initialise the secret provider.
+// argument1: logger
+// argument2: optionalArgs which can hold the providerType which is VPC/Bluemix/Softlayer. Currently, VPC/Bluemix is supported.
 func newManagedSecretProvider(logger *zap.Logger, optionalArgs ...string) (*ManagedSecretProvider, error) {
 	logger.Info("Connecting to sidecar")
-	kc, err := k8s_utils.Getk8sClientSet(logger)
+	kc, err := k8s_utils.Getk8sClientSet()
 	if err != nil {
 		logger.Info("Error fetching k8s client set", zap.Error(err))
 		return nil, err
@@ -90,8 +92,8 @@ func newManagedSecretProvider(logger *zap.Logger, optionalArgs ...string) (*Mana
 	logger.Info("Unable to fetch endpoints from cloud-conf", zap.Error(err))
 	err = msp.initEndpointsUsingStorageSecretStore()
 	if err != nil {
-		logger.Error("Unable to fetch endpoints from storage-secret-store", zap.Error(err))
-		return nil, err
+		// Do not return even if there is an error reading endpoints, just logging error
+		logger.Warn("Unable to fetch endpoints from storage-secret-store", zap.Error(err))
 	}
 
 	logger.Info("Initialized managed secret provider")
