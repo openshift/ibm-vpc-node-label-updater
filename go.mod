@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	github.com/IBM/ibmcloud-volume-interface v1.1.2
-	github.com/IBM/secret-common-lib v1.1.2
-	github.com/IBM/secret-utils-lib v1.1.2
+	github.com/IBM/secret-common-lib v1.1.4
+	github.com/IBM/secret-utils-lib v1.1.4
 	github.com/stretchr/testify v1.8.0
 	go.uber.org/zap v1.20.0
 	k8s.io/api v0.26.1
