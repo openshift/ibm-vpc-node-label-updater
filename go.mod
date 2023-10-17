@@ -7,6 +7,7 @@ require (
 	github.com/IBM/ibmcloud-volume-interface v1.0.0-beta8
 	github.com/stretchr/testify v1.6.1
 	go.uber.org/zap v1.16.0
+	golang.org/x/net v0.17.0 // indirect
 	k8s.io/api v0.20.2
 	k8s.io/apimachinery v0.21.1
 	k8s.io/client-go v0.20.2
