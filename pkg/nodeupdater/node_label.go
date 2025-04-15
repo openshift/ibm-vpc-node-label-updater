@@ -23,7 +23,6 @@ import (
 	"go.uber.org/zap"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -31,7 +30,7 @@ import (
 // VpcNodeLabelUpdater ...
 type VpcNodeLabelUpdater struct {
 	Node                *v1.Node
-	K8sClient           *kubernetes.Clientset
+	K8sClient           kubernetes.Interface
 	Logger              *zap.Logger
 	StorageSecretConfig *StorageSecretConfig
 }

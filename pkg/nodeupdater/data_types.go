@@ -31,11 +31,8 @@ type NodeInfo struct {
 
 // StorageSecretConfig ...
 type StorageSecretConfig struct {
-	APIKey              string
-	IamTokenExchangeURL string
-	RiaasEndpointURL    *url.URL
-	BasicAuthString     string
-	IAMAccessToken      string
+	RiaasEndpointURL *url.URL
+	IAMAccessToken   string
 }
 
 // AccessTokenResponse ...
