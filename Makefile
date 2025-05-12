@@ -58,14 +58,6 @@ test:
 	$(GOPATH)/bin/gotestcover -v -race -short -coverprofile=cover.out ${GOPACKAGES}
 	go tool cover -html=cover.out -o=cover.html  # Uncomment this line when UT in place.
 
-.PHONY: update
-update:
-	./hack/update-vendor.sh
-
-.PHONY: verify
-verify:
-	./hack/verify-vendor.sh
-
 .PHONY: ut-coverage
 ut-coverage: deps fmt test
 
